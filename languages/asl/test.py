@@ -1,0 +1,1 @@
+import os; os.system("asl.bat main.asl")

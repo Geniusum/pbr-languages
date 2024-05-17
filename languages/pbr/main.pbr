@@ -1,0 +1,12 @@
+; Code qui attend 1 seconde
+
+PUSH A 0
+PUSH B 1
+PUSH C 20000 ; 20000 itterrations --> 1s
+ADD
+POP B
+POP A
+MOVE C A
+MOVE C B
+PRINT A
+NCASE 3

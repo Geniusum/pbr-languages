@@ -1,0 +1,30 @@
+; Suite Factorielle Décroissante Multiplicative Avec Délai De 1s
+PUSH A 0
+PUSH B 1
+PUSH C 10
+
+PUSH A 0
+PUSH B 1
+PUSH C 100000
+ADD
+POP B
+POP A
+MOVE C A
+MOVE C B
+NCASE 7
+POP A
+POP B
+
+ADD
+POP B
+POP A
+MOVE C A
+MOVE C B
+PUSH B 0.00001
+MUL
+POP B
+POP A
+MOVE C A
+PRINT A
+
+NCASE 3

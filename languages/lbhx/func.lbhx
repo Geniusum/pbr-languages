@@ -1,0 +1,125 @@
+; FUNC MAIN
+jump 80
+push a 1
+print a
+
+
+
+jump 126
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+; FUNC PRINT
+push a 3
+print a
+jump 120
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+; FUNC INTER
+push a 2
+print a
+jump 40
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+; FUNC END
+push a 4
+print a
+jump 2
+
+
