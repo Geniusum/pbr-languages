@@ -44,6 +44,51 @@ class Interpreter():
                 "limit": 0,
                 "stack": [],
                 "locked": True
+            },
+            "cha": { # Chunk A
+                "limit": 16,
+                "stack": [],
+                "locked": True
+            },
+            "chb": { # Chunk B
+                "limit": 16,
+                "stack": [],
+                "locked": True
+            },
+            "chc": { # Chunk C
+                "limit": 16,
+                "stack": [],
+                "locked": True
+            },
+            "chx": { # Chunk X
+                "limit": 16,
+                "stack": [],
+                "locked": True
+            },
+            "chy": { # Chunk Y
+                "limit": 16,
+                "stack": [],
+                "locked": True
+            },
+            "chz": { # Chunk Z
+                "limit": 16,
+                "stack": [],
+                "locked": True
+            },
+            "c1d": { # Chunk 1 dimensional
+                "limit": 16,
+                "stack": [],
+                "locked": True
+            },
+            "c2d": { # Chunk 2 dimensional
+                "limit": 256,
+                "stack": [],
+                "locked": True
+            },
+            "c3d": { # Chunk 3 dimensional
+                "limit": 4096,
+                "stack": [],
+                "locked": True
             }
         }
 
@@ -72,7 +117,8 @@ class Interpreter():
             "reset": "res", # Must be clear
             "clear": "clr",
             "pass": "pass",
-            "end": "end"
+            "end": "end",
+            "gst": "gst" # Get / Set / Call
         }
 
         self.err_pass = False
@@ -216,14 +262,17 @@ class Interpreter():
         except:
             pass
         if isinstance(input, int):
-            return input # Si c'est déjà un entier, le retourner tel quel
+            return input
         elif isinstance(input, float):
-            return float(input) # Si c'est un nombre à virgule, le convertir en entier
+            return float(input)
         elif isinstance(input, str):
             if len(input) > 0:
-                return ord(input[0]) # Retourner le code ASCII du premier caractère de la chaîne
+                if len(input) == 1:
+                    return ord(input)
+                else:
+                    return str(input)
             else:
-                return 0 # Si la chaîne est vide, retourner 0
+                return 0
         else:
             return 0
 
@@ -475,7 +524,7 @@ class Interpreter():
                         for source_stack in sources_stack_name:
                             self.initStack(source_stack)
                     else:
-                        self.error("Init", "Take one argument.")
+                        self.error("Init", "At minimum one argument.")
                 elif command == self.lexer["copyall"]:
                     if len(args) >= 2:
                         dest_stack_name = self.stackInitialized(self.stackExists(args[0]))
@@ -519,6 +568,20 @@ class Interpreter():
                         exit(0)
                     else:
                         self.error("End", "Take no argument.")
+                elif command == self.lexer["gst"]:
+                    if len(args) >= 1:
+                        try:
+                            _type = args[0].lower()
+                            if _type == "stklen":
+                                stack_name = self.stackInitialized(self.stackExists(args[1]))
+                                out_stack = self.stackInitialized(self.stackExists("iso"))
+                                self.push(out_stack, len(self.getStackList(stack_name)))
+                            else:
+                                self.error("Gst", f"Invalid gst type.")
+                        except Exception as e:
+                            self.error("Gst", f"Bad argument(s) / Exception : {e}.")
+                    else:
+                        self.error("Gst", "At minimum one argument.")
             index += 1
 
         self.endProgram()
