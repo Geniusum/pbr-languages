@@ -1,13 +1,16 @@
 import time
 import sys
 import random
+import gst
 
 class Interpreter():
     def __init__(self, code:str=""):
+        gst.initgst(self)
+
         self.code = code
         self.lines = self.code.splitlines()
 
-        self.active_line = 0
+        self.active_line = 1
 
         self.stacks = {
             "opx": { # Operation
@@ -89,6 +92,16 @@ class Interpreter():
                 "limit": 4096,
                 "stack": [],
                 "locked": True
+            },
+            "arg": { # Args values
+                "limit": 0,
+                "stack": [],
+                "locked": False
+            },
+            "bin": { # Bin, unused value
+                "limit": 0,
+                "stack": [],
+                "locked": False
             }
         }
 
@@ -110,6 +123,7 @@ class Interpreter():
             "mul": "mul",
             "div": "div",
             "chr": "chr",
+            "string": "str",
             "nb": "nb",
             "fill": "fill",
             "init": "ini",
@@ -118,11 +132,18 @@ class Interpreter():
             "clear": "clr",
             "pass": "pass",
             "end": "end",
-            "gst": "gst" # Get / Set / Call
+            "gst": "gst", # Get / Set / Call
+            "avoid": "avd"
         }
+
+        self.lines = self.parseComments(self.lines)
 
         self.err_pass = False
         self.err_count = 0
+        self.end_exit = True
+        self.from_file = "ROOT"
+        self.mode = "normal"
+        self.avoid = False
 
     def parseName(self, name:str):
         return name.lower().strip()
@@ -251,13 +272,19 @@ class Interpreter():
             if err_line == -1:
                 err_line = self.active_line
             try:
-                print(f"Error [{err_type}] line {err_line} : {err_message}\n\t{self.lines[err_line - 1]}", end="")
+                print(f"Error from {self.from_file} [{err_type}] line {err_line} : {err_message}\n\t{self.lines[err_line - 1]}", end="")
             except:
-                print(f"Error [{err_type}] : {err_message}", end="")
+                print(f"Error from {self.from_file} [{err_type}] : {err_message}", end="")
 
             self.endProgram()
 
-            exit(0)
+            if self.end_exit:
+                exit(0)
+
+    def parseComments(self, lines:list) -> list:
+        for index, line in enumerate(lines):
+            lines[index] = line.split(self.lexer["comment"])[0]
+        return lines
 
     def toInteger(self, input):
         try:
@@ -327,263 +354,272 @@ class Interpreter():
     def execInstruction(self, tokens:list[str]):
         command = tokens[0].lower()
         args = tokens[1:]
-        if command == self.lexer["comment"]:
-            pass
-        elif command == self.lexer["push"]:
-            if len(args) >= 2:
-                stack_name = self.stackInitialized(self.stackExists(args[0]))
-                values = []
-                for value in args[1:]:
-                    values.append(self.toInteger(value))
-                for value in values:
-                    self.push(stack_name, value)
-            else:
-                self.error("Push", "At minimum 2 arguments.")
-        elif command == self.lexer["pop"]:
-            if len(args) >= 1:
-                stacks_name = []
-                for name in args:
-                    stacks_name.append(self.stackInitialized(self.stackExists(name)))
-                for stack_name in stacks_name:
-                    self.pop(stack_name)
-            else:
-                self.error("Pop", "At minimum 1 arguments.")
-        elif command == self.lexer["move"]:
-            if len(args) >= 2:
-                dest_stack_name = self.stackInitialized(self.stackExists(args[0]))
-                sources_stack_name = []
-                for source_stack in args[1:]:
-                    sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
-                for source_stack in sources_stack_name:
-                    self.move(dest_stack_name, source_stack)
-            else:
-                self.error("Move", "At minimum 2 arguments.")
-        elif command == self.lexer["copy"]:
-            if len(args) >= 2:
-                dest_stack_name = self.stackInitialized(self.stackExists(args[0]))
-                sources_stack_name = []
-                for source_stack in args[1:]:
-                    sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
-                for source_stack in sources_stack_name:
-                    self.copy(dest_stack_name, source_stack)
-            else:
-                self.error("Copy", "At minimum 2 arguments.")
-        elif command == self.lexer["print"]:
-            if len(args) == 0:
-                in_stack = self.stackInitialized(self.stackExists("dmp"))
-                self.out(in_stack)
-            else:
-                self.error("Output", "Take no argument.")
-        elif command == self.lexer["input"]:
-            if len(args) == 0:
-                out_stack = self.stackInitialized(self.stackExists("iso"))
-                self.push(out_stack, self.toInteger(input()))
-            else:
-                self.error("Input", "Take no argument.")
-        elif command == self.lexer["jump"]:
-            if len(args) == 1:
-                sel_line = int(self.toInteger(args[0])) - 1
-                index = sel_line
-            else:
-                self.error("Jump", "Take one argument.")
-        elif command == self.lexer["case"]:
-            if len(args) == 1:
-                sel_line = int(self.toInteger(args[0])) - 1
-                stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
-                stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
-                if type(stack_a) == str:
-                    stack_a = ord(stack_a)
-                if type(stack_b) == str:
-                    stack_b = ord(stack_b)
-                if stack_a == stack_b:
-                    index = sel_line
-            else:
-                self.error("Case", "Take one argument.")
-        elif command == self.lexer["ncase"]:
-            if len(args) == 1:
-                sel_line = int(self.toInteger(args[0])) - 1
-                stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
-                stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
-                if type(stack_a) == str:
-                    stack_a = ord(stack_a)
-                if type(stack_b) == str:
-                    stack_b = ord(stack_b)
-                if stack_a != stack_b:
-                    index = sel_line
-            else:
-                self.error("NCase", "Take one argument.")
-        elif command == self.lexer["lower"]:
-            if len(args) == 1:
-                sel_line = int(self.toInteger(args[0])) - 1
-                stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
-                stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
-                if type(stack_a) == str:
-                    stack_a = ord(stack_a)
-                if type(stack_b) == str:
-                    stack_b = ord(stack_b)
-                if stack_a < stack_b:
-                    index = sel_line
-            else:
-                self.error("Lower", "Take one argument.")
-        elif command == self.lexer["upper"]:
-            if len(args) == 1:
-                sel_line = int(self.toInteger(args[0])) - 1
-                stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
-                stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
-                if type(stack_a) == str:
-                    stack_a = ord(stack_a)
-                if type(stack_b) == str:
-                    stack_b = ord(stack_b)
-                if stack_a > stack_b:
-                    index = sel_line
-            else:
-                self.error("Upper", "Take one argument.")
-        elif command == self.lexer["add"]:
-            if len(args) == 0:
-                stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
-                stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
-                out_stack = self.stackInitialized(self.stackExists("iso"))
-                final = 0
-                if (type(stack_a) in [int, float] and type(stack_b) == str) or (type(stack_a) == str and type(stack_b) in [int, float]):
-                    stack_a, stack_b = str(stack_a), str(stack_b)
-                    final = stack_a + stack_b
-                    try:
-                        number = float(final)
-                        if int(final) == number:
-                            number = int(final)
-                        final = number
-                    except: pass
-
-                self.push(out_stack, final)
-            else:
-                self.error("Add", "Take no argument.")
-        elif command == self.lexer["rev"]:
-            if len(args) == 0:
-                stack_a = self.getLast(self.stackInitialized(self.stackExists("dmp")))
-                out_stack = self.stackInitialized(self.stackExists("iso"))
-                if type(stack_a) == str:
-                    stack_a = ord(stack_a)
-                self.push(out_stack, self.rev(stack_a))
-            else:
-                self.error("Rev", "Take no argument.")
-        elif command == self.lexer["mul"]:
-            if len(args) == 0:
-                stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
-                stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
-                out_stack = self.stackInitialized(self.stackExists("iso"))
-                if type(stack_a) == str:
-                    stack_a = ord(stack_a)
-                if type(stack_b) == str:
-                    stack_b = ord(stack_b)
-                self.push(out_stack, stack_a * stack_b)
-            else:
-                self.error("Mul", "Take no argument.")
-        elif command == self.lexer["div"]:
-            if len(args) == 0:
-                stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
-                stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
-                out_stack = self.stackInitialized(self.stackExists("iso"))
-                if type(stack_a) == str:
-                    stack_a = ord(stack_a)
-                if type(stack_b) == str:
-                    stack_b = ord(stack_b)
-                self.push(out_stack, stack_a / stack_b)
-            else:
-                self.error("Div", "Take no argument.")
-        elif command == self.lexer["chr"]:
-            if len(args) == 0:
-                stack_a = self.getLast(self.stackInitialized(self.stackExists("dmp")))
-                out_stack = self.stackInitialized(self.stackExists("iso"))
-                if type(stack_a) == str:
-                    self.error("Char", "Already a char.")
-                    self.push(out_stack, stack_a)
+        if not self.avoid:
+            if command == self.lexer["comment"]:
+                pass
+            elif command == self.lexer["push"]:
+                if len(args) >= 2:
+                    stack_name = self.stackInitialized(self.stackExists(args[0]))
+                    values = []
+                    for value in args[1:]:
+                        values.append(self.toInteger(value))
+                    for value in values:
+                        self.push(stack_name, value)
                 else:
-                    self.push(out_stack, self.intToChr(stack_a))
-            else:
-                self.error("Char", "Take no argument.")
-        elif command == self.lexer["nb"]:
-            if len(args) == 0:
-                stack_a = self.getLast(self.stackInitialized(self.stackExists("dmp")))
-                out_stack = self.stackInitialized(self.stackExists("iso"))
-                if type(stack_a) in [int, float]:
-                    self.error("Nb", "Already a number.")
-                self.push(out_stack, self.chrsToNb(stack_a))
-            else:
-                self.error("Nb", "Take no argument.")
-        elif command == self.lexer["fill"]:
-            if len(args) >= 1:
-                sources_stack_name = []
-                for source_stack in args:
-                    sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
-                for source_stack in sources_stack_name:
-                    self.fill(source_stack)
-            else:
-                self.error("Fill", "At minimum one argument.")
-        elif command == self.lexer["init"]:
-            if len(args) >= 1:
-                sources_stack_name = []
-                for source_stack in args:
-                    sources_stack_name.append(self.stackExists(source_stack))
-                for source_stack in sources_stack_name:
-                    self.initStack(source_stack)
-            else:
-                self.error("Init", "At minimum one argument.")
-        elif command == self.lexer["copyall"]:
-            if len(args) >= 2:
-                dest_stack_name = self.stackInitialized(self.stackExists(args[0]))
-                sources_stack_name = []
-                for source_stack in args[1:]:
-                    sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
-                for source_stack in sources_stack_name:
-                    self.copyall(dest_stack_name, source_stack)
-            else:
-                self.error("CopyAll", "At minimum 2 arguments.")
-        elif command == self.lexer["reset"]:
-            if len(args) >= 1:
-                sources_stack_name = []
-                for source_stack in args:
-                    sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
-                for source_stack in sources_stack_name:
-                    if not len(self.getStackList(source_stack)) == 0:
-                        self.error("Reset", f"Stack not empty : {source_stack}.")
+                    self.error("Push", "At minimum 2 arguments.")
+            elif command == self.lexer["pop"]:
+                if len(args) >= 1:
+                    stacks_name = []
+                    for name in args:
+                        stacks_name.append(self.stackInitialized(self.stackExists(name)))
+                    for stack_name in stacks_name:
+                        self.pop(stack_name)
+                else:
+                    self.error("Pop", "At minimum one argument.")
+            elif command == self.lexer["move"]:
+                if len(args) >= 2:
+                    dest_stack_name = self.stackInitialized(self.stackExists(args[0]))
+                    sources_stack_name = []
+                    for source_stack in args[1:]:
+                        sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
+                    for source_stack in sources_stack_name:
+                        self.move(dest_stack_name, source_stack)
+                else:
+                    self.error("Move", "At minimum 2 arguments.")
+            elif command == self.lexer["copy"]:
+                if len(args) >= 2:
+                    dest_stack_name = self.stackInitialized(self.stackExists(args[0]))
+                    sources_stack_name = []
+                    for source_stack in args[1:]:
+                        sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
+                    for source_stack in sources_stack_name:
+                        self.copy(dest_stack_name, source_stack)
+                else:
+                    self.error("Copy", "At minimum 2 arguments.")
+            elif command == self.lexer["print"]:
+                if len(args) == 0:
+                    in_stack = self.stackInitialized(self.stackExists("dmp"))
+                    self.out(in_stack)
+                else:
+                    self.error("Output", "Take no argument.")
+            elif command == self.lexer["input"]:
+                if len(args) == 0:
+                    out_stack = self.stackInitialized(self.stackExists("iso"))
+                    self.push(out_stack, self.toInteger(input()))
+                else:
+                    self.error("Input", "Take no argument.")
+            elif command == self.lexer["jump"]:
+                if len(args) == 1:
+                    sel_line = int(self.toInteger(args[0])) - 1
+                    self.active_line = sel_line
+                else:
+                    self.error("Jump", "Take one argument.")
+            elif command == self.lexer["case"]:
+                if len(args) == 1:
+                    sel_line = int(self.toInteger(args[0])) - 1
+                    stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
+                    stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
+                    if type(stack_a) == str:
+                        stack_a = ord(stack_a)
+                    if type(stack_b) == str:
+                        stack_b = ord(stack_b)
+                    if stack_a == stack_b:
+                        self.active_line = sel_line
+                else:
+                    self.error("Case", "Take one argument.")
+            elif command == self.lexer["ncase"]:
+                if len(args) == 1:
+                    sel_line = int(self.toInteger(args[0])) - 1
+                    stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
+                    stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
+                    if type(stack_a) == str:
+                        stack_a = ord(stack_a)
+                    if type(stack_b) == str:
+                        stack_b = ord(stack_b)
+                    if stack_a != stack_b:
+                        self.active_line = sel_line
+                else:
+                    self.error("NCase", "Take one argument.")
+            elif command == self.lexer["lower"]:
+                if len(args) == 1:
+                    sel_line = int(self.toInteger(args[0])) - 1
+                    stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
+                    stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
+                    if type(stack_a) == str:
+                        stack_a = ord(stack_a)
+                    if type(stack_b) == str:
+                        stack_b = ord(stack_b)
+                    if stack_a < stack_b:
+                        self.active_line = sel_line
+                else:
+                    self.error("Lower", "Take one argument.")
+            elif command == self.lexer["upper"]:
+                if len(args) == 1:
+                    sel_line = int(self.toInteger(args[0])) - 1
+                    stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
+                    stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
+                    if type(stack_a) == str:
+                        stack_a = ord(stack_a)
+                    if type(stack_b) == str:
+                        stack_b = ord(stack_b)
+                    if stack_a > stack_b:
+                        self.active_line = sel_line
+                else:
+                    self.error("Upper", "Take one argument.")
+            elif command == self.lexer["add"]:
+                if len(args) == 0:
+                    stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
+                    stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
+                    out_stack = self.stackInitialized(self.stackExists("iso"))
+                    self.push(out_stack, stack_a + stack_b)
+                else:
+                    self.error("Add", "Take no argument.")
+            elif command == self.lexer["rev"]:
+                if len(args) == 0:
+                    stack_a = self.getLast(self.stackInitialized(self.stackExists("dmp")))
+                    out_stack = self.stackInitialized(self.stackExists("iso"))
+                    if type(stack_a) == str:
+                        stack_a = ord(stack_a)
+                    self.push(out_stack, self.rev(stack_a))
+                else:
+                    self.error("Rev", "Take no argument.")
+            elif command == self.lexer["mul"]:
+                if len(args) == 0:
+                    stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
+                    stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
+                    out_stack = self.stackInitialized(self.stackExists("iso"))
+                    if type(stack_a) == str:
+                        stack_a = ord(stack_a)
+                    if type(stack_b) == str:
+                        stack_b = ord(stack_b)
+                    self.push(out_stack, stack_a * stack_b)
+                else:
+                    self.error("Mul", "Take no argument.")
+            elif command == self.lexer["div"]:
+                if len(args) == 0:
+                    stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
+                    stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
+                    out_stack = self.stackInitialized(self.stackExists("iso"))
+                    if type(stack_a) == str:
+                        stack_a = ord(stack_a)
+                    if type(stack_b) == str:
+                        stack_b = ord(stack_b)
+                    self.push(out_stack, stack_a / stack_b)
+                else:
+                    self.error("Div", "Take no argument.")
+            elif command == self.lexer["chr"]:
+                if len(args) == 0:
+                    stack_a = self.getLast(self.stackInitialized(self.stackExists("dmp")))
+                    out_stack = self.stackInitialized(self.stackExists("iso"))
+                    if type(stack_a) == str:
+                        self.error("Char", "Already a char.")
+                        self.push(out_stack, stack_a)
                     else:
-                        self.reset(source_stack)
-            else:
-                self.error("Reset", "At minimum one arguments.")
-        elif command == self.lexer["clear"]:
-            if len(args) >= 1:
-                sources_stack_name = []
-                for source_stack in args:
-                    sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
-                for source_stack in sources_stack_name:
-                    self.clear(source_stack)
-            else:
-                self.error("Clear", "At minimum one arguments.")
-        elif command == self.lexer["pass"]:
-            if len(args) == 0:
-                if not self.err_pass: self.err_pass = True
-                else: self.err_pass = False
-            else:
-                self.error("Pass", "Take no argument.")
-        elif command == self.lexer["end"]:
-            if len(args) == 0:
-                self.endProgram()
-                exit(0)
-            else:
-                self.error("End", "Take no argument.")
-        elif command == self.lexer["gst"]:
-            if len(args) >= 1:
-                try:
-                    _type = args[0].lower()
-                    if _type in gst.names.keys():
-                        gst.names[_type](self, args[1:])
+                        self.push(out_stack, self.intToChr(stack_a))
+                else:
+                    self.error("Char", "Take no argument.")
+            elif command == self.lexer["string"]:
+                if len(args) == 0:
+                    stack_a = self.getLast(self.stackInitialized(self.stackExists("dmp")))
+                    out_stack = self.stackInitialized(self.stackExists("iso"))
+                    if type(stack_a) == str:
+                        self.error("String", "Already a string.")
+                        self.push(out_stack, stack_a)
                     else:
-                        self.error("Gst", f"Invalid gst type.")
-                except Exception as e:
-                    self.error("Gst", f"Bad argument(s) / Exception : {e}.")
+                        self.push(out_stack, str(stack_a))
+                else:
+                    self.error("Char", "Take no argument.")
+            elif command == self.lexer["nb"]:
+                if len(args) == 0:
+                    stack_a = self.getLast(self.stackInitialized(self.stackExists("dmp")))
+                    out_stack = self.stackInitialized(self.stackExists("iso"))
+                    if type(stack_a) in [int, float]:
+                        self.error("Nb", "Already a number.")
+                    self.push(out_stack, self.chrsToNb(stack_a))
+                else:
+                    self.error("Nb", "Take no argument.")
+            elif command == self.lexer["fill"]:
+                if len(args) >= 1:
+                    sources_stack_name = []
+                    for source_stack in args:
+                        sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
+                    for source_stack in sources_stack_name:
+                        self.fill(source_stack)
+                else:
+                    self.error("Fill", "At minimum one argument.")
+            elif command == self.lexer["init"]:
+                if len(args) >= 1:
+                    sources_stack_name = []
+                    for source_stack in args:
+                        sources_stack_name.append(self.stackExists(source_stack))
+                    for source_stack in sources_stack_name:
+                        self.initStack(source_stack)
+                else:
+                    self.error("Init", "At minimum one argument.")
+            elif command == self.lexer["copyall"]:
+                if len(args) >= 2:
+                    dest_stack_name = self.stackInitialized(self.stackExists(args[0]))
+                    sources_stack_name = []
+                    for source_stack in args[1:]:
+                        sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
+                    for source_stack in sources_stack_name:
+                        self.copyall(dest_stack_name, source_stack)
+                else:
+                    self.error("CopyAll", "At minimum 2 arguments.")
+            elif command == self.lexer["reset"]:
+                if len(args) >= 1:
+                    sources_stack_name = []
+                    for source_stack in args:
+                        sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
+                    for source_stack in sources_stack_name:
+                        if not len(self.getStackList(source_stack)) == 0:
+                            self.error("Reset", f"Stack not empty : {source_stack}.")
+                        else:
+                            self.reset(source_stack)
+                else:
+                    self.error("Reset", "At minimum one arguments.")
+            elif command == self.lexer["clear"]:
+                if len(args) >= 1:
+                    sources_stack_name = []
+                    for source_stack in args:
+                        sources_stack_name.append(self.stackInitialized(self.stackExists(source_stack)))
+                    for source_stack in sources_stack_name:
+                        self.clear(source_stack)
+                else:
+                    self.error("Clear", "At minimum one arguments.")
+            elif command == self.lexer["pass"]:
+                if len(args) == 0:
+                    self.err_pass = not self.err_pass
+                else:
+                    self.error("Pass", "Take no argument.")
+            elif command == self.lexer["end"]:
+                if len(args) == 0:
+                    self.endProgram()
+                    if self.end_exit:
+                        exit(0)
+                else:
+                    self.error("End", "Take no argument.")
+            elif command == self.lexer["gst"]:
+                if len(args) >= 1:
+                    try:
+                        _type = args[0].lower()
+                        if _type in gst.names.keys():
+                            gst.names[_type](self, args[1:])
+                        else:
+                            self.error("Gst", f"Invalid gst type.")
+                    except Exception as e:
+                        self.error("Gst", f"Bad argument(s) / Exception : {e}.")
+                else:
+                    self.error("Gst", "At minimum one argument.")
+            elif command == self.lexer["avoid"]: pass
             else:
-                self.error("Gst", "At minimum one argument.")
-        
+                self.error("Syntax", "Invalid command.")
+        if command == self.lexer["avoid"]:
+            if len(args) == 0:
+                self.avoid = not self.avoid
+            else:
+                self.error("Avoid", "Take no argument.")
+
     def execute(self, log:bool=False, debug:bool=False):
         if log:
             self.start_time = time.time()
@@ -591,22 +627,24 @@ class Interpreter():
 
         self.log = log
 
-        lines = self.lines
-        index = 1
-        while index <= len(lines):
-            line = lines[index - 1]
-            self.active_line = index
-            tokens = line.split()
-            if debug:
-                print(index, line)
-                self.printStacks()
-            if len(tokens):
-                self.execInstruction(tokens)
-            index += 1
+        self.active_line = 1
+        while True:
+            if not self.active_line <= len(self.lines):
+                break
+            else:
+                line = self.lines[self.active_line - 1]
+                tokens = line.split()
+                if debug:
+                    print(self.active_line, line)
+                    self.printStacks()
+                if len(tokens):
+                    self.execInstruction(tokens)
+                self.active_line += 1
 
         self.endProgram()
 
     def shell(self, log:bool=False, debug:bool=False):
+        self.mode = "shell"
         if log:
             self.start_time = time.time()
             print("Shell instance started...\n")
@@ -617,7 +655,7 @@ class Interpreter():
         index = 1
         while True:
             try:
-                line = str(input(f"{self.err_count} ERRs ; PASS : {self.err_pass} >> "))
+                line = str(input(f"{self.err_count} ERRs ; PASS : {self.err_pass} ; AVD : {self.avoid} >> "))
                 self.active_line = index
                 tokens = line.split()
                 if debug:
@@ -627,10 +665,9 @@ class Interpreter():
                     self.execInstruction(tokens)
             except Exception as e:
                 self.error("Interpreter", f"Exception : {e}.")
+        self.mode = "normal"
 
 if __name__ == "__main__":
-    import gst
-
     args = []
     options = []
 
@@ -646,6 +683,7 @@ if __name__ == "__main__":
         shell_mode = False
         log = False
         debug = False
+        argv = []
         if file_path == "@shell":
             shell_mode = True
         for option in options:
@@ -653,13 +691,19 @@ if __name__ == "__main__":
                 log = True
             elif option == "-d":
                 debug = True
+            else:
+                argv.append(option)
         if len(args) >= 2:
             options = args[1:]
         if not shell_mode:
             ins = Interpreter(open(file_path, encoding='utf-8-sig').read())
+            for arg in argv:
+                ins.push("arg", arg)
             ins.execute(log, debug)
         else:
             ins = Interpreter()
+            for arg in argv:
+                ins.push("arg", arg)
             ins.shell(log, debug)
     else:
         print("Usage : rud <file_path> <options>")

@@ -1,0 +1,5 @@
+pass ; If max is already initialized
+ini max
+pass
+
+mov
