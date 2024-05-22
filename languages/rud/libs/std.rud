@@ -68,4 +68,4 @@ gst function start greet
     gst call greet_init
     
     avd
-    gst function end greetd
+    gst function end greet
