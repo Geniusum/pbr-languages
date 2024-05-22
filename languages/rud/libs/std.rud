@@ -1,0 +1,71 @@
+gst function start greet_init
+    ini opx opr iso flx dmp stk max
+    push flx 2
+    push dmp Hello, 32 World!
+    gst stklen dmp
+    mov stk iso
+    push stk 1
+    pass
+    chr
+    pop dmp
+    mov opr iso
+    chr
+    pop dmp
+    mov opx iso
+    add
+    gst call greet_inter nan
+    
+    avd
+    gst function end greet_init
+
+gst function start greet_inter
+    mov flx iso
+    cpa dmp flx
+    out
+    gst call greet_end nan
+    
+    avd
+    gst function end greet_inter
+
+gst function start greet_loop
+    mov max stk
+    mov opr stk
+    mov opx flx
+    gst case equal gst call greet_inter nan
+    gst case upper gst call greet_inter nan
+    mov stk opr
+    mov opr max
+    add
+    pop opx
+    mov flx iso
+    mov stk opr
+    gst call greet_loop2 nan
+    
+    avd
+    gst function end greet_loop
+
+gst function start greet_loop2
+    pop opr opx
+    mov opr iso
+    chr
+    pop dmp
+    mov opx iso
+    add
+    gst call greet_loop nan
+
+    avd
+    gst function end greet_loop2
+
+gst function start greet_end
+    clr opx opr iso flx dmp stk max
+    res opx opr iso flx dmp stk max
+    pass
+
+    avd
+    gst function end greet_end
+
+gst function start greet
+    gst call greet_init
+    
+    avd
+    gst function end greet

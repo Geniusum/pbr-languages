@@ -156,11 +156,43 @@ def call(self: rud.Interpreter, args:list[str]):
     else:
         self.error("Gst", "Invalid function call syntax.")
 
+def case(self: rud.Interpreter, args:list[str]):
+    # Syntax : <'>'/'<'/'?='> <instruction ...>
+    if len(args) >= 2:
+        operators = {
+            "upper": ["upper", ">"],
+            "lower": ["lower", "<"],
+            "equal": ["equal", "?="]
+        }
+
+        operator = args[0]
+        instruction = args[1:]
+        stack_a = self.getLast(self.stackInitialized(self.stackExists("opx")))
+        stack_b = self.getLast(self.stackInitialized(self.stackExists("opr")))
+        if type(stack_a) == str:
+            stack_a = ord(stack_a)
+        if type(stack_b) == str:
+            stack_b = ord(stack_b)
+        if operator in operators["upper"]:
+            if stack_a > stack_b:
+                self.execInstruction(instruction.split())
+        elif operator in operators["lower"]:
+            if stack_a < stack_b:
+                self.execInstruction(instruction.split())
+        elif operator in operators["equal"]:
+            if stack_a == stack_b:
+                self.execInstruction(instruction.split())
+        else:
+            self.error("Gst", "Invalid operator.")
+    else:
+        self.error("Gst", "Invalid function call syntax.")
+
 names = {
     "stklen": stklen,
     "execute": execute,
     "include": include,
     "inject": inject,
     "function": function,
-    "call": call
+    "call": call,
+    "case": case
 }

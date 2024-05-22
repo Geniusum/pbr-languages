@@ -102,6 +102,11 @@ class Interpreter():
                 "limit": 0,
                 "stack": [],
                 "locked": False
+            },
+            "nan": { # Used for not wanted redirection
+                "limit": 1,
+                "stack": [0],
+                "locked": False
             }
         }
 
