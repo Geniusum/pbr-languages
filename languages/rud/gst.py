@@ -148,12 +148,14 @@ def call(self: rud.Interpreter, args:list[str]):
                 tokens = line.split()
                 if len(tokens):
                     self.execInstruction(tokens)
-            for item in self.stacks["fo"]["stack"]:
-                self.push(output_stack, item)
-            del self.stacks["fi"]
-            del self.stacks["fo"]
-            del self.stacks["fch"]
+            if "fi" in self.stacks.keys():
+                for item in self.stacks["fo"]["stack"]:
+                    self.push(output_stack, item)
+                del self.stacks["fi"]
+                del self.stacks["fo"]
+                del self.stacks["fch"]
     else:
+        print(args)
         self.error("Gst", "Invalid function call syntax.")
 
 def case(self: rud.Interpreter, args:list[str]):

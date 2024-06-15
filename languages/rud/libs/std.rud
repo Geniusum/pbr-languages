@@ -1,3 +1,12 @@
+gst function start print
+    ini opx opr iso flx dmp stk max
+    push flx 2
+    cpa dmp fi
+gst stklen dmp
+
+    avd
+    gst function end print
+
 gst function start greet_init
     ini opx opr iso flx dmp stk max
     push flx 2
@@ -65,7 +74,7 @@ gst function start greet_end
     gst function end greet_end
 
 gst function start greet
-    gst call greet_init
+    gst call greet_init nan
     
     avd
     gst function end greet

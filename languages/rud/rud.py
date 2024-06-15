@@ -187,8 +187,11 @@ class Interpreter():
     def chrsToNb(self, chrs:str):
         try:
             number = float(chrs)
-            if int(chrs) == number:
-                number = int(chrs)
+            try:
+                if int(chrs) == number:
+                    number = int(chrs)
+            except:
+                pass
         except:
             self.error("Char(s) to integer", "Invalid char(s) format, impossible to convert it to an integer or a decimal.")
         else:
@@ -353,7 +356,7 @@ class Interpreter():
             if len(stack):
                 print(f"\t{stack_name.upper()} INIT {int(not stack_init)} :\n\t\t{sep.join(stack)}")
             else:
-                print(f"\t{stack_name.upper()} INIT {int(not stack_init)} : -")
+                print(f"\t{stack_name.upper()} INIT {int(not stack_init)} : - | ", end="")
         print()
 
     def execInstruction(self, tokens:list[str]):
